@@ -1,0 +1,90 @@
+#!/usr/bin/env ruby
+
+require 'aws-sdk'
+
+class String
+  # colorization
+  def colorize(color_code)
+    "\e[#{color_code}m#{self}\e[0m"
+  end
+
+  def red
+    colorize(31)
+  end
+
+  def green
+    colorize(32)
+  end
+
+  def yellow
+    colorize(33)
+  end
+
+  def pink
+    colorize(35)
+  end
+end
+
+# Connect to AWS and list which logs groups are available to us
+client = Aws::CloudWatchLogs::Client.new(region: 'us-east-1')
+log_groups = client.describe_log_groups.log_groups.sort_by{ |lg| lg.log_group_name }
+log_groups.each_with_index do |lg, i|
+  printf("%3d %s\n", i + 1, lg.log_group_name.green)
+end
+
+# Prompt to select a log group
+log_number = -1
+while log_number <= 0 || log_number > log_groups.count
+  puts "Please enter a log group number between 1 and #{log_groups.size}:"
+  log_number = gets.chomp.strip.to_i
+end
+
+# Process input
+selected_index = log_number - 1
+log_group = log_groups[selected_index]
+
+# Get the log streams for this log group.
+log_streams = client.describe_log_streams(log_group_name: log_group.log_group_name).log_streams.sort_by{|ls| -ls.last_event_timestamp}.reject{|ls| ls.last_event_timestamp < ((Time.now().to_i - (3600 * 48)) * 1000) }
+longest_name = log_streams.map(&:log_stream_name).map(&:green).map(&:size).max
+printf("     %-#{longest_name}s %s\n", "Log Stream".green, "Last Event")
+log_streams.each_with_index do |ls, i|
+  printf("%4d %#{longest_name}s %s\n", i + 1, ls.log_stream_name.green, Time.at(ls.last_event_timestamp/1000))
+end
+
+# Prompt to select a log stream
+log_number = -1
+while log_number <= 0 || log_number > log_streams.count
+  puts "Please enter a log group number between 1 and #{log_streams.size}:"
+  log_number = gets.chomp.strip.to_i
+end
+
+# Process input
+selected_index = log_number - 1
+log_stream = log_streams[selected_index]
+
+# Set up before fetching
+first_fetch = Time.now().utc - 30 # 30 seconds ago
+interval = 1
+last_response = nil
+
+# Begin fetching each `interval`
+while true
+  options = {
+    log_group_name: log_group.log_group_name,
+    log_stream_name: log_stream.log_stream_name
+  }
+  if last_response.nil?
+    options.merge!({
+      start_time: first_fetch.to_i * 1000
+    })
+  else
+    options.merge!({
+        next_token: last_response.next_forward_token
+    })
+  end
+  last_response = client.get_log_events(options)
+  last_response.events.each do |event|
+    printf("%s %s\n", Time.at(event.timestamp).to_s.green, event.message)
+  end
+  sleep(interval)
+end
