@@ -2,6 +2,11 @@
 
 require 'aws-sdk'
 
+trap "SIGINT" do
+  puts "Exiting"
+  exit 130
+end
+
 class String
   # colorization
   def colorize(color_code)
@@ -66,6 +71,8 @@ log_stream = log_streams[selected_index]
 first_fetch = Time.now().utc - 30 # 30 seconds ago
 interval = 1
 last_response = nil
+
+puts "Polling every #{interval} seconds for new log events..."
 
 # Begin fetching each `interval`
 while true
