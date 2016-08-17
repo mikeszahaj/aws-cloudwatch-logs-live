@@ -91,7 +91,7 @@ while true
   end
   last_response = client.get_log_events(options)
   last_response.events.each do |event|
-    printf("%s %s\n", Time.at(event.timestamp).to_s.green, event.message)
+    printf("%s %s\n", Time.at(event.timestamp/1000).to_s.green, event.message)
   end
   sleep(interval)
 end
