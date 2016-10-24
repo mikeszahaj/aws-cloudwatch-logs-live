@@ -49,7 +49,7 @@ selected_index = log_number - 1
 log_group = log_groups[selected_index]
 
 # Get the log streams for this log group.
-log_streams = client.describe_log_streams(log_group_name: log_group.log_group_name).log_streams.sort_by{|ls| -ls.last_event_timestamp}.reject{|ls| ls.last_event_timestamp < ((Time.now().to_i - (3600 * 48)) * 1000) }
+log_streams = client.describe_log_streams(log_group_name: log_group.log_group_name).log_streams.reject{|ls| ls.last_event_timestamp.to_i < ((Time.now().to_i - (3600 * 48)) * 1000) }.sort_by{|ls| -ls.last_event_timestamp.to_i}
 longest_name = log_streams.map(&:log_stream_name).map(&:green).map(&:size).max
 printf("     %-#{longest_name}s %s\n", "Log Stream".green, "Last Event")
 log_streams.each_with_index do |ls, i|
